@@ -4,7 +4,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define LED_COUNT 142
+#define LED_COUNT 40
 #define LED_PIN 6
 #define HUE_INC (255.0 / LED_COUNT)
 #define INTERRUPT_PIN 2
@@ -35,7 +35,8 @@ uint8_t menuItem = MENU_ITEM_ALL;
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+#define OLED_RESET -1
+Adafruit_SSD1306 display(OLED_RESET);
 
 void setup() {
   pinMode(INTERRUPT_PIN, INPUT_PULLUP);
@@ -45,7 +46,7 @@ void setup() {
   
   attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), handleInput, CHANGE);
   
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3D);
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   
   FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_COUNT);
   for (uint8_t i = 0; i < LED_COUNT; i++) {
