@@ -23,10 +23,11 @@ CRGB nextLeds[LED_COUNT];
 
 uint8_t buttonPressed = BUTTON_NONE;
 
-#define MENU_ITEM_ALL 0
-#define MENU_ITEM_LEFT 1
-#define MENU_ITEM_CENTER 2
-#define MENU_ITEM_RIGHT 3
+#define MENU_ITEM_OFF 0
+#define MENU_ITEM_ALL 1
+#define MENU_ITEM_LEFT 2
+#define MENU_ITEM_CENTER 3
+#define MENU_ITEM_RIGHT 4
 #define MENU_ITEM_COUNT (MENU_ITEM_RIGHT + 1)
 
 uint8_t menuItem = MENU_ITEM_ALL;
@@ -71,6 +72,9 @@ void loop() {
       fill_solid(nextLeds, LED_COUNT, CRGB::Black);
       transition = true;
       switch(menuItem) {
+        case MENU_ITEM_OFF:
+          fill_solid(nextLeds, LED_COUNT, CRGB::Black);
+          break;
         case MENU_ITEM_ALL:
           fill_solid(nextLeds, LED_COUNT, CRGB::White);
           break;
@@ -128,6 +132,11 @@ void drawMenu() {
   display.setCursor(0, 0);
   display.println("White LED Menu");
   display.println("--------");
+  if (menuItem == MENU_ITEM_OFF) {
+    display.println("->Off");  
+  } else {
+    display.println("  Off");  
+  }
   if (menuItem == MENU_ITEM_ALL) {
     display.println("->All");  
   } else {
