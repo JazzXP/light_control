@@ -46,6 +46,7 @@ void setup() {
   pinMode(ENTER_BUTTON_PIN, INPUT_PULLUP);
   
   attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), handleInput, CHANGE);
+  Serial.begin(9600);
   
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   
@@ -104,19 +105,25 @@ void loop() {
   }
 }
 
+
+unsigned long last_interrupt_time = 0;
 void handleInput() {
-  static unsigned long last_interrupt_time = 0;
   unsigned long interrupt_time = millis();
   // If interrupts come faster than 200ms, assume it's a bounce and ignore
   if (interrupt_time - last_interrupt_time > 200) 
   {
-    if (digitalRead(UP_BUTTON_PIN)) {
+    Serial.println("Interrupt");
+    last_interrupt_time = interrupt_time;
+    if (digitalRead(UP_BUTTON_PIN) == LOW) {
+      Serial.println("Up");
       buttonPressed = BUTTON_UP;
       return;
-    } else if (digitalRead(DOWN_BUTTON_PIN)) {
+    } else if (digitalRead(DOWN_BUTTON_PIN) == LOW) {
+      Serial.println("Down");
       buttonPressed = BUTTON_DOWN;
       return;
-    } else if (digitalRead(ENTER_BUTTON_PIN)) {
+    } else if (digitalRead(ENTER_BUTTON_PIN) == LOW) {
+      Serial.println("Enter");
       buttonPressed = BUTTON_ENTER;
       return;
     }
