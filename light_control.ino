@@ -4,13 +4,15 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define LED_COUNT 40
+#define LED_COUNT 10
 #define LED_PIN 6
 #define HUE_INC (255.0 / LED_COUNT)
 #define INTERRUPT_PIN 2
 #define UP_BUTTON_PIN 3
 #define DOWN_BUTTON_PIN 4
 #define ENTER_BUTTON_PIN 5
+
+const byte buttonPins[] PROGMEM = { UP_BUTTON_PIN, DOWN_BUTTON_PIN, ENTER_BUTTON_PIN };
 
 CRGB leds[LED_COUNT];
 CRGB prevLeds[LED_COUNT];
@@ -21,7 +23,7 @@ CRGB nextLeds[LED_COUNT];
 #define BUTTON_DOWN 2
 #define BUTTON_ENTER 3
 
-uint8_t buttonPressed = BUTTON_NONE;
+byte buttonPressed = BUTTON_NONE;
 
 #define MENU_ITEM_OFF 0
 #define MENU_ITEM_ALL 1
@@ -30,28 +32,28 @@ uint8_t buttonPressed = BUTTON_NONE;
 #define MENU_ITEM_RIGHT 4
 #define MENU_ITEM_COUNT (MENU_ITEM_RIGHT + 1)
 
-uint8_t menuItem = MENU_ITEM_ALL;
+byte menuItem = MENU_ITEM_ALL;
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 
 #define OLED_RESET -1
-Adafruit_SSD1306 display(OLED_RESET);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void setup() {
-  pinMode(INTERRUPT_PIN, INPUT_PULLUP);
-  pinMode(UP_BUTTON_PIN, INPUT_PULLUP);
-  pinMode(DOWN_BUTTON_PIN, INPUT_PULLUP);
-  pinMode(ENTER_BUTTON_PIN, INPUT_PULLUP);
+  configureCommon();
   
   attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), handleInput, CHANGE);
   Serial.begin(9600);
   
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
   
   FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_COUNT);
-  for (uint8_t i = 0; i < LED_COUNT; i++) {
+  for (byte i = 0; i < LED_COUNT; i++) {
     leds[i] = CHSV((uint8_t)(i * HUE_INC), 255, 255);
     delay(50);
     FastLED.show();
@@ -66,7 +68,7 @@ void loop() {
       if (menuItem > 0) { menuItem--; }
       break;
     case BUTTON_DOWN:
-      if (menuItem < MENU_ITEM_COUNT) { menuItem++; }
+      if (menuItem < MENU_ITEM_COUNT-1) { menuItem++; }
       break;
     case BUTTON_ENTER:
       memcpy(prevLeds, leds, sizeof(CRGB) * LED_COUNT);
@@ -112,25 +114,43 @@ void handleInput() {
   // If interrupts come faster than 200ms, assume it's a bounce and ignore
   if (interrupt_time - last_interrupt_time > 200) 
   {
-    Serial.println("Interrupt");
     last_interrupt_time = interrupt_time;
+    configureDistinct();
     if (digitalRead(UP_BUTTON_PIN) == LOW) {
-      Serial.println("Up");
       buttonPressed = BUTTON_UP;
       return;
     } else if (digitalRead(DOWN_BUTTON_PIN) == LOW) {
-      Serial.println("Down");
       buttonPressed = BUTTON_DOWN;
       return;
     } else if (digitalRead(ENTER_BUTTON_PIN) == LOW) {
-      Serial.println("Enter");
       buttonPressed = BUTTON_ENTER;
       return;
     }
     buttonPressed = BUTTON_NONE;
   }
   last_interrupt_time = interrupt_time;
+  configureCommon();
 }
+
+void configureCommon() {
+  pinMode(INTERRUPT_PIN, INPUT_PULLUP);
+
+  for (byte i = 0; i < sizeof(buttonPins) / sizeof(byte); i++) {
+    pinMode(buttonPins[i], OUTPUT);
+    digitalWrite(buttonPins[i], LOW);
+  }
+}
+
+void configureDistinct() {
+  pinMode(INTERRUPT_PIN, OUTPUT);
+  digitalWrite(INTERRUPT_PIN, LOW);
+
+  for (byte i = 0; i < sizeof(buttonPins) / sizeof(byte); i++) {
+    pinMode(buttonPins[i], INPUT_PULLUP);
+  }
+}
+
+
 
 void drawMenu() {
   display.clearDisplay();
