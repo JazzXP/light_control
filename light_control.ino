@@ -4,13 +4,17 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define LED_COUNT 10
-#define LED_PIN 6
-#define HUE_INC (255.0 / LED_COUNT)
+#define LED_COUNT 144
+
+#define LED_PIN 25
 #define INTERRUPT_PIN 2
-#define UP_BUTTON_PIN 3
-#define DOWN_BUTTON_PIN 4
-#define ENTER_BUTTON_PIN 5
+#define UP_BUTTON_PIN 12
+#define DOWN_BUTTON_PIN 27
+#define ENTER_BUTTON_PIN 14
+#define I2C_SDA 22
+#define I2C_SCL 21
+
+#define HUE_INC (255.0 / LED_COUNT)
 
 const byte buttonPins[] PROGMEM = { UP_BUTTON_PIN, DOWN_BUTTON_PIN, ENTER_BUTTON_PIN };
 
@@ -37,18 +41,41 @@ byte menuItem = MENU_ITEM_ALL;
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-
 #define OLED_RESET -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+TwoWire DisplayWire = TwoWire(0);
+
+Adafruit_SSD1306 *display;
+
+unsigned long last_interrupt_time[] = {0, 0, 0};
+
+void IRAM_ATTR handleUpInput() {
+  handleInput(BUTTON_UP);
+}
+void IRAM_ATTR handleDownInput() {
+  handleInput(BUTTON_DOWN);
+}
+void IRAM_ATTR handleEnterInput() {
+  handleInput(BUTTON_ENTER);
+}
 
 void setup() {
-  configureCommon();
+  DisplayWire.setPins(I2C_SDA, I2C_SCL);
+  // No need to worry about the memory leak here, it's meant to last the entire time the micro is active
+  display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &DisplayWire, OLED_RESET);
+
+  pinMode(UP_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(DOWN_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(ENTER_BUTTON_PIN, INPUT_PULLUP);
   
-  attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), handleInput, CHANGE);
+  attachInterrupt(UP_BUTTON_PIN, handleUpInput, FALLING);
+  attachInterrupt(DOWN_BUTTON_PIN, handleDownInput, FALLING);
+  attachInterrupt(ENTER_BUTTON_PIN, handleEnterInput, FALLING);
   Serial.begin(9600);
-  
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("SSD1306 allocation failed"));
+  Serial.println(F("Starting"));
+
+  if(!display->begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed")); // Typically OOM
     for(;;); // Don't proceed, loop forever
   }
   
@@ -107,83 +134,46 @@ void loop() {
   }
 }
 
-
-unsigned long last_interrupt_time = 0;
-void handleInput() {
+void handleInput(int button) {
   unsigned long interrupt_time = millis();
-  // If interrupts come faster than 200ms, assume it's a bounce and ignore
-  if (interrupt_time - last_interrupt_time > 200) 
-  {
-    last_interrupt_time = interrupt_time;
-    configureDistinct();
-    if (digitalRead(UP_BUTTON_PIN) == LOW) {
-      buttonPressed = BUTTON_UP;
-      return;
-    } else if (digitalRead(DOWN_BUTTON_PIN) == LOW) {
-      buttonPressed = BUTTON_DOWN;
-      return;
-    } else if (digitalRead(ENTER_BUTTON_PIN) == LOW) {
-      buttonPressed = BUTTON_ENTER;
-      return;
-    }
-    buttonPressed = BUTTON_NONE;
-  }
-  last_interrupt_time = interrupt_time;
-  configureCommon();
-}
-
-void configureCommon() {
-  pinMode(INTERRUPT_PIN, INPUT_PULLUP);
-
-  for (byte i = 0; i < sizeof(buttonPins) / sizeof(byte); i++) {
-    pinMode(buttonPins[i], OUTPUT);
-    digitalWrite(buttonPins[i], LOW);
+  if (interrupt_time - last_interrupt_time[button] > 200) {
+    last_interrupt_time[button] = interrupt_time;
+    buttonPressed = button;
   }
 }
-
-void configureDistinct() {
-  pinMode(INTERRUPT_PIN, OUTPUT);
-  digitalWrite(INTERRUPT_PIN, LOW);
-
-  for (byte i = 0; i < sizeof(buttonPins) / sizeof(byte); i++) {
-    pinMode(buttonPins[i], INPUT_PULLUP);
-  }
-}
-
-
 
 void drawMenu() {
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 0);
-  display.println("White LED Menu");
-  display.println("--------");
+  display->clearDisplay();
+  display->setTextSize(1);
+  display->setTextColor(WHITE);
+  display->setCursor(0, 0);
+  display->println("White LED Menu");
+  display->println("--------");
   if (menuItem == MENU_ITEM_OFF) {
-    display.println("->Off");  
+    display->println("->Off");  
   } else {
-    display.println("  Off");  
+    display->println("  Off");  
   }
   if (menuItem == MENU_ITEM_ALL) {
-    display.println("->All");  
+    display->println("->All");  
   } else {
-    display.println("  All");  
+    display->println("  All");  
   }
   if (menuItem == MENU_ITEM_LEFT) {
-    display.println("->Left");  
+    display->println("->Left");  
   } else {
-    display.println("  Left");  
+    display->println("  Left");  
   }
   if (menuItem == MENU_ITEM_CENTER) {
-    display.println("->Center");  
+    display->println("->Center");  
   } else {
-    display.println("  Center");  
+    display->println("  Center");  
   }
   if (menuItem == MENU_ITEM_RIGHT) {
-    display.println("->Right");  
+    display->println("->Right");  
   } else {
-    display.println("  Right");  
+    display->println("  Right");  
   }
   
-  display.display(); 
+  display->display(); 
 }
