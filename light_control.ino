@@ -6,8 +6,7 @@
 
 #define LED_COUNT 144
 
-#define LED_PIN 25
-#define INTERRUPT_PIN 2
+#define LED_PIN 23
 #define UP_BUTTON_PIN 12
 #define DOWN_BUTTON_PIN 27
 #define ENTER_BUTTON_PIN 14
@@ -17,10 +16,6 @@
 #define HUE_INC (255.0 / LED_COUNT)
 
 const byte buttonPins[] PROGMEM = { UP_BUTTON_PIN, DOWN_BUTTON_PIN, ENTER_BUTTON_PIN };
-
-CRGB leds[LED_COUNT];
-CRGB prevLeds[LED_COUNT];
-CRGB nextLeds[LED_COUNT];
 
 #define BUTTON_NONE 0
 #define BUTTON_UP 1
@@ -44,8 +39,11 @@ byte menuItem = MENU_ITEM_ALL;
 #define OLED_RESET -1
 
 TwoWire DisplayWire = TwoWire(0);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &DisplayWire, OLED_RESET);
 
-Adafruit_SSD1306 *display;
+CRGB leds[LED_COUNT];
+CRGB prevLeds[LED_COUNT];
+CRGB nextLeds[LED_COUNT];
 
 unsigned long last_interrupt_time[] = {0, 0, 0};
 
@@ -61,9 +59,6 @@ void IRAM_ATTR handleEnterInput() {
 
 void setup() {
   DisplayWire.setPins(I2C_SDA, I2C_SCL);
-  // No need to worry about the memory leak here, it's meant to last the entire time the micro is active
-  display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &DisplayWire, OLED_RESET);
-
   pinMode(UP_BUTTON_PIN, INPUT_PULLUP);
   pinMode(DOWN_BUTTON_PIN, INPUT_PULLUP);
   pinMode(ENTER_BUTTON_PIN, INPUT_PULLUP);
@@ -74,20 +69,26 @@ void setup() {
   Serial.begin(9600);
   Serial.println(F("Starting"));
 
-  if(!display->begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed")); // Typically OOM
     for(;;); // Don't proceed, loop forever
   }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println("Starting...");
+  display.display(); 
   
   FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_COUNT);
   for (byte i = 0; i < LED_COUNT; i++) {
     leds[i] = CHSV((uint8_t)(i * HUE_INC), 255, 255);
-    delay(50);
+    delay(25);
     FastLED.show();
   }
-  delay(500);
 }
-
+bool outputMenuSerial = false;
 void loop() {
   static bool transition = false;
   switch (buttonPressed) {
@@ -107,15 +108,17 @@ void loop() {
           break;
         case MENU_ITEM_ALL:
           fill_solid(nextLeds, LED_COUNT, CRGB::White);
+          outputMenuSerial = true;
           break;
         case MENU_ITEM_LEFT:
           fill_solid(nextLeds, LED_COUNT / 3, CRGB::White);
           break;
         case MENU_ITEM_CENTER:
-          fill_solid(&(nextLeds[(LED_COUNT / 2) - (LED_COUNT / 3)]), LED_COUNT / 3, CRGB::White);
+          fill_solid(&(nextLeds[(LED_COUNT / 2) - (LED_COUNT / 3 / 2)]), LED_COUNT / 3, CRGB::White);
           break;
         case MENU_ITEM_RIGHT:
           fill_solid(&(nextLeds[LED_COUNT - (LED_COUNT / 3)]), LED_COUNT / 3, CRGB::White);
+          break;
       }
       break;
   }
@@ -123,14 +126,21 @@ void loop() {
   drawMenu();
 
   static fract8 pct = 0;
+  static fract8 old_pct = pct;
   if (transition) {
-    pct++;
-    if (pct == 255) {
+    old_pct = pct;
+    pct+=2;
+    if (pct == 255 || old_pct > pct) {
       transition = false;
+      pct = 0;
+      old_pct = 0;
+      memcpy(leds, nextLeds, sizeof(CRGB) * LED_COUNT);
+    } else {
+      blend(prevLeds, nextLeds, leds, LED_COUNT, pct);  
     }
-    blend(prevLeds, nextLeds, leds, LED_COUNT, pct);
+    
     FastLED.show();
-    delay(20);
+    //delay(2);
   }
 }
 
@@ -143,37 +153,37 @@ void handleInput(int button) {
 }
 
 void drawMenu() {
-  display->clearDisplay();
-  display->setTextSize(1);
-  display->setTextColor(WHITE);
-  display->setCursor(0, 0);
-  display->println("White LED Menu");
-  display->println("--------");
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println("White LED Menu");
+  display.println("--------");
   if (menuItem == MENU_ITEM_OFF) {
-    display->println("->Off");  
+    display.println("->Off");  
   } else {
-    display->println("  Off");  
+    display.println("  Off");  
   }
   if (menuItem == MENU_ITEM_ALL) {
-    display->println("->All");  
+    display.println("->All");  
   } else {
-    display->println("  All");  
+    display.println("  All");  
   }
   if (menuItem == MENU_ITEM_LEFT) {
-    display->println("->Left");  
+    display.println("->Left");  
   } else {
-    display->println("  Left");  
+    display.println("  Left");  
   }
   if (menuItem == MENU_ITEM_CENTER) {
-    display->println("->Center");  
+    display.println("->Center");  
   } else {
-    display->println("  Center");  
+    display.println("  Center");  
   }
   if (menuItem == MENU_ITEM_RIGHT) {
-    display->println("->Right");  
+    display.println("->Right");  
   } else {
-    display->println("  Right");  
+    display.println("  Right");  
   }
   
-  display->display(); 
+  display.display(); 
 }
